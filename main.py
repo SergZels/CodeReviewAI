@@ -6,8 +6,8 @@ from businessLogic import logger, GitHubRepoManager, GITHUB_TOKEN, MODEL, get_pr
     get_code_review, answer_parse
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
-# import redis
-#import json
+import redis
+import json
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
@@ -23,12 +23,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# REDIS_URL = "127.0.0.1"
-# REDIS_PORT = 6379
-# redis_client = redis.Redis(host=REDIS_URL, port=REDIS_PORT, decode_responses=True)
+REDIS_URL = "localhost" #It works fine on the local machine, but there are some problems on the server. Look later
+REDIS_PORT = 6379
+redis_client = redis.Redis(host=REDIS_URL, port=REDIS_PORT, decode_responses=True)
 
-# def get_redis():
-#     return redis_client
+def get_redis():
+    return redis_client
 
 class CandidateLevel(str, Enum):
     JUNIOR = 'Junior'
@@ -56,7 +56,7 @@ class Answer(BaseModel):
     GPTReview: str = None
 
 @app.post('/review', response_model=Answer)
-async def review(review_request: Review):#, redis=Depends(get_redis)):
+async def review(review_request: Review, redis=Depends(get_redis)):
     github_url = review_request.github_repo_url
     file_paths: list = []
     prompt: str = ""
@@ -65,10 +65,10 @@ async def review(review_request: Review):#, redis=Depends(get_redis)):
     rating_text: str = ""
     conclusion_text: str = ""
 
-    # cache_key = f"review:{github_url}"
-    # cached_data = redis.get(cache_key)
-    # if cached_data:
-    #     return json.loads(cached_data)
+    cache_key = f"review:{github_url}"
+    cached_data = redis.get(cache_key)
+    if cached_data:
+        return json.loads(cached_data)
 
     try:
         repo_manager = GitHubRepoManager(github_url, GITHUB_TOKEN)
@@ -97,7 +97,7 @@ async def review(review_request: Review):#, redis=Depends(get_redis)):
                     GPTReview=review_result, key_problems=key_problems_text,
                     rating=rating_text, conclusion=conclusion_text)
 
-    # redis.setex(cache_key, 60*5, json.dumps(answer.dict()))
+    redis.setex(cache_key, 60*5, json.dumps(answer.dict()))
     logger.info(f"Request received - {review_request}")
     return answer
 '''

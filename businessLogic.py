@@ -1,9 +1,15 @@
 import os
 import git
+from dotenv import load_dotenv
 import logging
 import tempfile
 import aiofiles
 import asyncio
+from openai import AsyncOpenAI,OpenAI
+
+load_dotenv()
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+OPENAI_TOKEN = os.getenv("OPENAI_TOKEN")
 
 class AsyncFileHandler(logging.FileHandler):
     def emit(self, record):
@@ -18,6 +24,7 @@ formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(messag
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
+#----------------------------GitHub------------------------------------------------------------------
 class GitHubRepoManager:
     def __init__(self, github_url, github_token):
         self.github_url = github_url
@@ -56,3 +63,33 @@ class GitHubRepoManager:
                     all_content += f"\n\n--- {relative_path} ---\n\n{content}"
 
         return file_paths, all_content
+
+#------------------------------OpenAI--------------------------------------------------------------------
+
+client = OpenAI(api_key=OPENAI_TOKEN)
+def get_code_review(code_content:str, candidate_level:str, description:str, model:str):
+    prompt = f"""
+    You are an expert code reviewer. The code below is written by a {candidate_level} developer.
+    Here is the task description:
+    {description}
+
+    Code:
+    {code_content}
+
+    Please provide:
+    1. A list of key problems in one paragraph.
+    2. A rating out of 5 for a {candidate_level} developer.
+    3. A conclusion regarding the overall quality and what the developer can improve.
+    """
+
+    response = client.chat.completions.create(
+        model= model,#"gpt-4-turbo",
+        messages=[
+            {"role": "system", "content": "You are a senior software engineer tasked with reviewing code."},
+            {"role": "user", "content": prompt},
+        ],
+        max_tokens=500,
+        temperature=0.7,
+    )
+
+    return response['choices'][0]['message']['content']

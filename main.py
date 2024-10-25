@@ -2,10 +2,10 @@ from fastapi import FastAPI, Request, Form
 from pydantic import BaseModel, validator, field_validator
 import re
 from enum import Enum
-from dotenv import load_dotenv
+
 from businessLogic import logger, GitHubRepoManager
 
-load_dotenv()
+
 app = FastAPI()
 
 

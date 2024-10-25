@@ -1,10 +1,9 @@
 from fastapi import FastAPI, Request, Form
 from pydantic import BaseModel, validator, field_validator
-import os
 import re
 from enum import Enum
 from dotenv import load_dotenv
-
+from businessLogic import logger, GitHubRepoManager
 
 load_dotenv()
 app = FastAPI()
@@ -28,9 +27,19 @@ class Review(BaseModel):
         return value
 
 
-
-
 @app.post('/review', response_model=Review)
 async def review(review_request:Review):
+    github_url = 'https://github.com/SergZels/MidjourneyFlaskProject.git'
+    github_token = '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'
+
+    repo_manager = GitHubRepoManager(github_url, github_token)
+    file_paths, all_content = await repo_manager.clone_repo()
+
+    print("Список файлів:")
+    print(file_paths)
+
+    print("\nВміст файлів:")
+    print(all_content)
+
     return review_request
 

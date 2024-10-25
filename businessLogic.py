@@ -6,6 +6,7 @@ import tempfile
 import aiofiles
 import asyncio
 from openai import AsyncOpenAI
+import re
 
 load_dotenv()
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
@@ -83,9 +84,11 @@ def get_prompt(code_content: str, candidate_level: str, description: str):
       {code_content}
 
       Please provide:
-      1. A list of key problems in one paragraph.
-      2. A rating out of 5 for a {candidate_level} developer.
-      3. A conclusion regarding the overall quality and what the developer can improve.
+      1. **Key Problems** - a list of the main issues, written in a single paragraph or bullet points, starting with "Key Problems:".
+      2. **Rating** - a score out of 5 for the developer’s performance, starting with "Rating:".
+      3. **Conclusion** - a summary of the overall quality and suggestions for improvement, starting with "Conclusion:".
+
+      Please make sure to use these headings exactly as written (Key Problems, Rating, Conclusion) so the response remains consistent.
       """
     return prompt
 
@@ -107,3 +110,14 @@ async def get_code_review(prompt: str, model: str, TOKEN=None):
     )
 
     return response['choices'][0]['message']['content']
+
+def answer_parse(response: str):
+    key_problems = re.search(r"(?<=Key Problems:\n)(.*?)(?=\n\nRating:)", response, re.DOTALL)
+    rating = re.search(r"(?<=Rating:\s)(\d+(\.\d+)?/\d+)", response)
+    conclusion = re.search(r"(?<=Conclusion:\n)(.*)", response, re.DOTALL)
+
+    key_problems_text = key_problems.group(0).strip() if key_problems else None
+    rating_text = rating.group(0).strip() if rating else None
+    conclusion_text = conclusion.group(0).strip() if conclusion else None
+
+    return key_problems_text, rating_text, conclusion_text

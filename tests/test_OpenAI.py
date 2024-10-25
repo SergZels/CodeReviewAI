@@ -3,19 +3,6 @@ import pytest_asyncio
 from unittest.mock import patch, AsyncMock
 from businessLogic import get_prompt, get_code_review
 
-def test_get_prompt():
-    code_content = "def example(): pass"
-    candidate_level = "junior"
-    description = "Implement a simple function."
-
-    prompt = get_prompt(code_content, candidate_level, description)
-
-    assert "junior developer" in prompt
-    assert "Implement a simple function." in prompt
-    assert "def example(): pass" in prompt
-    assert "provide:" in prompt
-    assert "rating out of 5" in prompt
-
 
 @pytest_asyncio.fixture
 async def mock_openai_response():

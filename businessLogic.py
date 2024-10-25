@@ -5,11 +5,13 @@ import logging
 import tempfile
 import aiofiles
 import asyncio
-from openai import AsyncOpenAI,OpenAI
+from openai import AsyncOpenAI, OpenAI
 
 load_dotenv()
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 OPENAI_TOKEN = os.getenv("OPENAI_TOKEN")
+MODEL = os.getenv("MODEL")
+
 
 class AsyncFileHandler(logging.FileHandler):
     def emit(self, record):
@@ -24,7 +26,8 @@ formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(messag
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
-#----------------------------GitHub------------------------------------------------------------------
+
+# ----------------------------GitHub------------------------------------------------------------------
 class GitHubRepoManager:
     def __init__(self, github_url, github_token):
         self.github_url = github_url
@@ -41,7 +44,7 @@ class GitHubRepoManager:
         tokenized_url = self.github_url.replace('https://', f'https://{self.github_token}@')
 
         with tempfile.TemporaryDirectory() as tmpdirname:
-            print(f"Клонування в тимчасову директорію {tmpdirname}")
+            print(f"Cloning to a temporary directory {tmpdirname}")
 
             git.Repo.clone_from(tokenized_url, tmpdirname)
             file_paths, all_content = await self.list_files_and_content(tmpdirname)
@@ -53,6 +56,9 @@ class GitHubRepoManager:
         all_content = ""
 
         for root, dirs, files in os.walk(local_repo_path):
+
+            dirs[:] = [d for d in dirs if d != '.git']
+
             for file in files:
                 file_path = os.path.join(root, file)
                 relative_path = os.path.relpath(file_path, local_repo_path)
@@ -64,26 +70,33 @@ class GitHubRepoManager:
 
         return file_paths, all_content
 
-#------------------------------OpenAI--------------------------------------------------------------------
 
-client = OpenAI(api_key=OPENAI_TOKEN)
-def get_code_review(code_content:str, candidate_level:str, description:str, model:str):
+# ------------------------------OpenAI--------------------------------------------------------------------
+def get_prompt(code_content: str, candidate_level: str, description: str):
     prompt = f"""
-    You are an expert code reviewer. The code below is written by a {candidate_level} developer.
-    Here is the task description:
-    {description}
+      You are an expert code reviewer. The code below is written by a {candidate_level} developer.
+      Here is the task description:
+      {description}
 
-    Code:
-    {code_content}
+      Code:
+      {code_content}
 
-    Please provide:
-    1. A list of key problems in one paragraph.
-    2. A rating out of 5 for a {candidate_level} developer.
-    3. A conclusion regarding the overall quality and what the developer can improve.
-    """
+      Please provide:
+      1. A list of key problems in one paragraph.
+      2. A rating out of 5 for a {candidate_level} developer.
+      3. A conclusion regarding the overall quality and what the developer can improve.
+      """
+    return prompt
+
+
+def get_code_review(prompt: str, model: str, TOKEN=None):
+    if TOKEN:
+        client = OpenAI(api_key=TOKEN)
+    else:
+        client = OpenAI(api_key=OPENAI_TOKEN)
 
     response = client.chat.completions.create(
-        model= model,#"gpt-4-turbo",
+        model=model,  # "gpt-4-turbo",
         messages=[
             {"role": "system", "content": "You are a senior software engineer tasked with reviewing code."},
             {"role": "user", "content": prompt},

@@ -3,9 +3,25 @@ from pydantic import BaseModel, validator, field_validator
 import re
 from enum import Enum
 from businessLogic import logger, GitHubRepoManager, GITHUB_TOKEN, MODEL, get_prompt, get_code_review
+from fastapi.templating import Jinja2Templates
+from fastapi.middleware.cors import CORSMiddleware
+
 
 app = FastAPI()
+templates = Jinja2Templates(directory="templates")
+origins = [
+    "http://localhost:7777",
+    "http://zelse.asuscomm.com:5000/",
+    "http://zelse.asuscomm.com"
 
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class CandidateLevel(str, Enum):
     JUNIOR = 'Junior'
@@ -35,6 +51,7 @@ async def review(review_request: Review):
     github_url = review_request.github_repo_url
     file_paths = []
     prompt = ""
+    review_result=""
 
     try:
         repo_manager = GitHubRepoManager(github_url, GITHUB_TOKEN)
@@ -51,14 +68,53 @@ async def review(review_request: Review):
     except Exception as e:
         print(e)
         logger.error(f"Error occurred during processing {e}")
-
-    try:
-        review_result = get_code_review(prompt=prompt, model=MODEL)
-    except Exception as e:
-        print(e)
-        review_result = f"Error occurred during processing {e}"
-        logger.error(f"Error occurred during processing {e}")
+    else:
+        try:
+            review_result = get_code_review(prompt=prompt, model=MODEL)
+        except Exception as e:
+            print(e)
+            review_result = f"Error occurred during processing {e}"
+            logger.error(f"Error occurred during processing {e}")
 
     answer = Answer(file_paths=file_paths, prompt=prompt, GPTReview=review_result)
 
     return answer
+
+@app.get('/') # a simple frontend with reactivity
+async def index(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
+
+@app.post('/reviewHTMX')
+async def reviewHTMX(request: Request,
+                     git_hub_repo_url: str = Form(...),
+                     openai_api_key: str = Form(...),
+                     description: str = Form(...),
+                     level: str = Form(...),
+                     ):
+
+    file_paths = []
+    reviewResult = ""
+    prompt=""
+
+
+    try:
+        repo_manager = GitHubRepoManager(git_hub_repo_url, GITHUB_TOKEN)
+        file_paths, all_content = await repo_manager.clone_repo()
+
+        prompt = get_prompt(code_content=all_content,
+                            description=description,
+                            candidate_level=level)
+
+    except Exception as e:
+        print(e)
+        logger.error(f"Error occurred during processing {e}")
+    else:
+        try:
+            reviewResult = get_code_review(prompt=prompt, model=MODEL,TOKEN=openai_api_key)
+        except Exception as e:
+            print(e)
+            reviewResult = f"Error occurred during processing {e}"
+            logger.error(f"Error occurred during processing {e}")
+    return templates.TemplateResponse("reviewHTMX.html", {"request": request,
+                                                          "file_paths": file_paths,
+                                                          "review_result": f"{reviewResult} \n   -- Prompt-- {prompt}"})

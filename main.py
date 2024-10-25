@@ -37,7 +37,6 @@ class CandidateLevel(str, Enum):
     MIDDLE = 'Middle'
     SENIOR = 'Senior'
 
-
 class Review(BaseModel):
     assignment_description: str
     github_repo_url: str
@@ -85,8 +84,6 @@ async def review(review_request: Review, redis=Depends(get_redis)):
         prompt = get_prompt(code_content=code_content,
                             description=description,
                             candidate_level=candidate_level)
-
-
     except Exception as e:
         print(e)
         logger.error(f"Error in GitHib section {e}")
@@ -102,11 +99,9 @@ async def review(review_request: Review, redis=Depends(get_redis)):
 
     answer = Answer(file_paths=file_paths, prompt=prompt,
                     GPTReview=review_result, key_problems=key_problems_text,
-                    rating=rating_text, conclusion=conclusion_text
-                    )
+                    rating=rating_text, conclusion=conclusion_text                    )
 
     redis.setex(cache_key, 60*5, json.dumps(answer.dict()))
-
     logger.info(f"Request received - {review_request}")
     return answer
 

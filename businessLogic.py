@@ -31,6 +31,14 @@ logger.addHandler(handler)
 
 # ----------------------------GitHub------------------------------------------------------------------
 class GitHubRepoManager:
+    """Class to manage operations on a GitHub repository, including cloning and listing file contents.
+
+     Attributes:
+         github_url (str): The URL of the GitHub repository.
+         github_token (str): GitHub access token for authentication.
+         owner (str): The owner of the GitHub repository.
+         repo (str): The name of the repository.
+     """
     def __init__(self, github_url, github_token):
         self.github_url = github_url
         self.github_token = github_token
@@ -43,6 +51,16 @@ class GitHubRepoManager:
         return owner, repo
 
     async def clone_repo(self):
+        """Clones the GitHub repository to a temporary directory and retrieves file paths and content.
+
+            The repository is cloned using the tokenized URL, and all files' relative paths and content
+            are collected.
+
+            Returns:
+              Tuple[List[str], str]: A tuple containing:
+                   - List of file paths (relative to the root of the repository).
+                    - All content of the files as a single concatenated string.
+        """
         tokenized_url = self.github_url.replace('https://', f'https://{self.github_token}@')
 
         with tempfile.TemporaryDirectory() as tmpdirname:
@@ -54,6 +72,19 @@ class GitHubRepoManager:
             return file_paths, all_content
 
     async def list_files_and_content(self, local_repo_path):
+        """Recursively lists files and reads their content from the local repository.
+
+             This method excludes the `.git` directory and reads the contents of each file
+             asynchronously, appending the contents with headers for each file.
+
+             Args:
+                 local_repo_path (str): The path to the local cloned repository.
+
+             Returns:
+                 Tuple[List[str], str]: A tuple containing:
+                     - List of file paths (relative to the root of the repository).
+                     - All content of the files as a single concatenated string with headers.
+        """
         file_paths = []
         all_content = ""
 

@@ -1,11 +1,10 @@
 from fastapi import FastAPI, Request, Form
-from pydantic import BaseModel, validator, field_validator
+from pydantic import BaseModel, field_validator
 import re
 from enum import Enum
 from businessLogic import logger, GitHubRepoManager, GITHUB_TOKEN, MODEL, get_prompt, get_code_review
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
-
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
@@ -22,6 +21,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 class CandidateLevel(str, Enum):
     JUNIOR = 'Junior'
@@ -41,17 +41,19 @@ class Review(BaseModel):
             raise ValueError('The URL must be a valid GitHub repository link.')
         return value
 
+
 class Answer(BaseModel):
     file_paths: list[str]
     prompt: str
     GPTReview: str = None
+
 
 @app.post('/review', response_model=Answer)
 async def review(review_request: Review):
     github_url = review_request.github_repo_url
     file_paths = []
     prompt = ""
-    review_result=""
+    review_result = ""
 
     try:
         repo_manager = GitHubRepoManager(github_url, GITHUB_TOKEN)
@@ -67,22 +69,24 @@ async def review(review_request: Review):
 
     except Exception as e:
         print(e)
-        logger.error(f"Error occurred during processing {e}")
+        logger.error(f"Error in GitHib section {e}")
     else:
         try:
-            review_result = get_code_review(prompt=prompt, model=MODEL)
+            review_result = await get_code_review(prompt=prompt, model=MODEL)
         except Exception as e:
+            review_result = f"Error in get_code_review {e}"
+            logger.error(review_result)
             print(e)
-            review_result = f"Error occurred during processing {e}"
-            logger.error(f"Error occurred during processing {e}")
 
     answer = Answer(file_paths=file_paths, prompt=prompt, GPTReview=review_result)
-
+    logger.info(f"Request received - {review_request}")
     return answer
 
-@app.get('/') # a simple frontend with reactivity
+
+@app.get('/')  # a simple frontend with reactivity
 async def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
+
 
 @app.post('/reviewHTMX')
 async def reviewHTMX(request: Request,
@@ -91,11 +95,9 @@ async def reviewHTMX(request: Request,
                      description: str = Form(...),
                      level: str = Form(...),
                      ):
-
     file_paths = []
     reviewResult = ""
-    prompt=""
-
+    prompt = ""
 
     try:
         repo_manager = GitHubRepoManager(git_hub_repo_url, GITHUB_TOKEN)
@@ -107,14 +109,21 @@ async def reviewHTMX(request: Request,
 
     except Exception as e:
         print(e)
-        logger.error(f"Error occurred during processing {e}")
+        logger.error(f"Error in GitHib section {e}")
+
     else:
+
         try:
-            reviewResult = get_code_review(prompt=prompt, model=MODEL,TOKEN=openai_api_key)
+
+            reviewResult = await get_code_review(prompt=prompt, model=MODEL, TOKEN=openai_api_key)
+
         except Exception as e:
-            print(e)
-            reviewResult = f"Error occurred during processing {e}"
-            logger.error(f"Error occurred during processing {e}")
+
+            reviewResult = f"Error in get_code_review {e}"
+            logger.error(reviewResult)
+
+    logger.info(
+        f"Received a request from the site - Git Hub url {git_hub_repo_url}, description - {description}, level - {level}")
     return templates.TemplateResponse("reviewHTMX.html", {"request": request,
                                                           "file_paths": file_paths,
                                                           "review_result": f"{reviewResult} \n   -- Prompt-- {prompt}"})

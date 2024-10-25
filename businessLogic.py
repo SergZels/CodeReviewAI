@@ -5,7 +5,7 @@ import logging
 import tempfile
 import aiofiles
 import asyncio
-from openai import AsyncOpenAI, OpenAI
+from openai import AsyncOpenAI
 
 load_dotenv()
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
@@ -13,6 +13,7 @@ OPENAI_TOKEN = os.getenv("OPENAI_TOKEN")
 MODEL = os.getenv("MODEL")
 
 
+#------------------logger-----------------------------------------------------------------------
 class AsyncFileHandler(logging.FileHandler):
     def emit(self, record):
         loop = asyncio.get_event_loop()
@@ -66,7 +67,7 @@ class GitHubRepoManager:
 
                 async with aiofiles.open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                     content = await f.read()
-                    all_content += f"\n\n--- {relative_path} ---\n\n{content}"
+                    all_content += f"\n--- {relative_path} ---\n{content}"
 
         return file_paths, all_content
 
@@ -89,13 +90,13 @@ def get_prompt(code_content: str, candidate_level: str, description: str):
     return prompt
 
 
-def get_code_review(prompt: str, model: str, TOKEN=None):
+async def get_code_review(prompt: str, model: str, TOKEN=None):
     if TOKEN:
-        client = OpenAI(api_key=TOKEN)
+        client = AsyncOpenAI(api_key=TOKEN)
     else:
-        client = OpenAI(api_key=OPENAI_TOKEN)
+        client = AsyncOpenAI(api_key=OPENAI_TOKEN)
 
-    response = client.chat.completions.create(
+    response = await client.chat.completions.create(
         model=model,  # "gpt-4-turbo",
         messages=[
             {"role": "system", "content": "You are a senior software engineer tasked with reviewing code."},
